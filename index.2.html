@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Three.js Building Example</title>
+  <style>
+    body { margin: 0; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script src="js/three.js"></script>
+  <script src="js/OrbitControls.js"></script>
+  <script >
+   
+   var scene = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 1, 6000);
+camera.position.set(0,0,8);
+camera.updateProjectionMatrix();
+// camera.lookAt(scene.position)
+
+var renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+
+var controls = new THREE.OrbitControls(camera, renderer.domElement)
+	// controls.enableDamping = true
+	// controls.dampingFactor = 0.25
+	controls.rotateSpeed = 0.35
+
+  var radarMaterial = new THREE.ShaderMaterial({
+  uniforms: {
+    time: { value: 0.0 },
+    center: { value: new THREE.Vector2(0.5, 0.5) },
+    resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+  },
+  vertexShader: `
+    varying vec2 vUv;
+
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+  uniform vec2 center;
+    uniform float time;
+    uniform vec2 resolution;
+    varying vec2 vUv;
+
+
+    void main() {
+      vec2 uv = vUv;
+      vec2 diff = center - uv;
+      float distance = length(diff);
+      float radius = 0.85 - mod(time - distance * 6.0, 0.8); 
+      vec3 yellowColor = vec3(1.0, 0.0, 0.0); // 黄色
+      float alpha = 1.0 - smoothstep(radius - 0.02, radius, 0.5); // 计算 alpha 值
+
+      // 在波纹扩散到最外层时，让红色变得更淡
+      float fadeOut = smoothstep(0.9, 1.0, radius);
+      vec3 finalColor = mix(yellowColor, vec3(1.0, 0.6, 0.6), fadeOut); // 使用 mix 函数调整颜色
+
+      // 使用 discard 处理透明部分
+      if (alpha < 0.5) {
+        discard;
+      }
+
+      if (gl_FrontFacing) {
+        
+        gl_FragColor = vec4(finalColor, alpha); // 设置颜色和 alpha
+      } else {
+          // 背向相机的处理
+        gl_FragColor = vec4(finalColor, alpha); // 设置颜色和 alpha
+      }
+    }
+  `
+});
+
+const geometry = new THREE.BoxGeometry( 1,2 , 1 );
+const material = new THREE.MeshBasicMaterial( { color: 0x00ffff, side: THREE.DoubleSide } );
+const cube = new THREE.Mesh( geometry, material );
+
+// var material = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
+
+scene.add( cube );
+
+// console.log(geometry.position)
+
+// var circleGeometry = new THREE.CircleGeometry(0.5, 30);
+var circleGeometry = new THREE.BufferGeometry().fromGeometry(new THREE.CircleGeometry(0.5, 30));
+var radarPlane = new THREE.Mesh(circleGeometry, radarMaterial);
+radarPlane.position.set(0,1.1,0)
+radarPlane.rotation.x = -Math.PI / 2
+scene.add(radarPlane);
+// circleGeometry.lookAt(camera.position)
+
+const light = new THREE.PointLight( 0xff0000, 1, 100 );
+light.position.set( 50, 50, 50 );
+scene.add( light );
+
+const dir = new THREE.Vector3( 1, 0, 0 );
+
+//normalize the direction vector (convert to vector of length 1)
+dir.normalize();
+
+const origin = new THREE.Vector3( 0, 0, 0 );
+const length = 5;
+const hex = 0xffff00;
+
+const arrowHelper = new THREE.ArrowHelper( dir, origin, length, hex );
+scene.add( arrowHelper );
+
+const axesHelper = new THREE.AxesHelper( 5 );
+scene.add( axesHelper );
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  // 更新雷达效果的时间
+  radarMaterial.uniforms.time.value += 0.012;
+  // radarPlane.rotation.x += Math.PI / 180
+  renderer.render(scene, camera);
+}
+
+// 启动渲染循环
+animate();
+
+
+  </script>
+</body>
+</html>
